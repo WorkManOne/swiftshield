@@ -110,6 +110,17 @@ extension SourceKitObfuscator {
 
         let name = rawName.removingParameterInformation
 
+        let isExtension = entityKind.description.contains(".decl.extension.")
+        if isExtension {
+            guard dataStore.declaredTypeNames.contains(name) else {
+                logger.log("* Skipping extension on external type: \(name)", verbose: true)
+                return
+            }
+        }
+        if kind == .object, !isExtension {
+            dataStore.declaredTypeNames.insert(name)
+        }
+        
         if namesToIgnore.contains(name) {
             logger.log("* Ignoring \(name) (USR: \(usr)) because its included in ignore-names", verbose: true)
             return

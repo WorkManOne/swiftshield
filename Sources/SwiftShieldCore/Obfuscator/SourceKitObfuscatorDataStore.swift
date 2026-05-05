@@ -9,4 +9,5 @@ final class SourceKitObfuscatorDataStore {
     var plists = Set<File>()
     var inheritsFromX = [String: [String: Bool]]()
     var fileForUSR = [String: File]()
+    var declaredTypeNames = Set<String>()
 }
