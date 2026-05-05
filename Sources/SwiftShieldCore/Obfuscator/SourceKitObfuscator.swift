@@ -42,13 +42,38 @@ extension SourceKitObfuscator {
             response.recurseEntities { [unowned self] dict in
                 self.preprocess(declarationEntity: dict, ofFile: file, fromModule: module)
             }
+////BASE:
+//            logger.log("--- Preprocessing indexing result of: \(file.name)")
+//            response.recurseEntities { [unowned self] dict in
+//                self.preprocess(declarationEntity: dict, ofFile: file, fromModule: module)
+//            }
+////AGGRESSIVE:
+//            var visited1 = Set<String>()
+//            response.recurseEntities(visited: &visited1) { [unowned self] dict in
+//                self.preprocess(declarationEntity: dict, ofFile: file, fromModule: module)
+//            }
+
             logger.log("--- Processing indexing result of: \(file.name)")
             try response.recurseEntities { [unowned self] dict in
-                if self.ignorePublic, dict.isPublic {
-                    return
-                }
+                if self.ignorePublic, dict.isPublic { return }
                 try self.process(declarationEntity: dict, ofFile: file, fromModule: module)
             }
+//// BASE:
+//            logger.log("--- Processing indexing result of: \(file.name)")
+//            try response.recurseEntities { [unowned self] dict in
+//                if self.ignorePublic, dict.isPublic {
+//                    return
+//                }
+//                try self.process(declarationEntity: dict, ofFile: file, fromModule: module)
+//            }
+////AGGRESSIVE:
+//            var visited2 = Set<String>()
+//            try response.recurseEntities(visited: &visited2) { [unowned self] dict in
+//                if self.ignorePublic, dict.isPublic {
+//                    return
+//                }
+//                try self.process(declarationEntity: dict, ofFile: file, fromModule: module)
+//            }
             let indexedFile = IndexedFile(file: file, response: response)
             self.dataStore.indexedFiles.append(indexedFile)
         }
@@ -153,6 +178,10 @@ extension SourceKitObfuscator {
         index.response.recurseEntities { [unowned self] dict in
             guard let kindId: SKUID = dict[self.keys.kind],
                 kindId.referenceType() != nil || kindId.declarationType() != nil,
+//        var visited3 = Set<String>()
+//        index.response.recurseEntities(visited: &visited3) { [unowned self] dict in
+//            guard let kindId: SKUID = dict[self.keys.kind],
+//                kindId.referenceType() != nil || kindId.declarationType() != nil,
                 let rawName: String = dict[self.keys.name],
                 let usr: String = dict[self.keys.usr],
                 self.dataStore.processedUsrs.contains(usr),
@@ -253,7 +282,7 @@ extension SourceKitObfuscator {
                 charArray[currentCharIndex] = obfuscatedName
                 currentReferenceIndex += 1
                 currentCharIndex += originalName.count
-                column += originalName.utf8Count
+                column += originalName.utf8Count + (wasInternalKeyword ? 2 : 0)
                 if wasInternalKeyword {
                     charArray[currentCharIndex] = ""
                 }
@@ -282,13 +311,13 @@ extension SourceKitObfuscator {
             return val
         }
 
+        // *** Защита от циклов: помечаем как false пока считаем ***
+        dataStore.inheritsFromX[usr, default: [:]][usrsKey] = false
+
         let req = SKRequestDictionary(sourcekitd: sourceKit)
         req[keys.request] = requests.cursorinfo
         req[keys.compilerargs] = module.compilerArguments
         req[keys.usr] = usr
-        // We have to store the file of the USR because it looks CursorInfo doesn't returns USRs if you use the wrong one
-        //, except if it's a closed source framework. No idea why it works like that.
-        // Hopefully this won't break in the future.
         let file: File = dataStore.fileForUSR[usr] ?? module.sourceFiles.first!
         req[keys.sourcefile] = file.path
         let cursorInfo = try sourceKit.sendSync(req)
@@ -308,6 +337,43 @@ extension SourceKitObfuscator {
         }
         return result(false)
     }
+//    func inheritsFromAnyUSR(_ usr: String, anyOf usrs: Set<String>, inModule module: Module) throws -> Bool {
+//        let usrsKey = usrs.joined(separator: " ")
+//        if let cache = dataStore.inheritsFromX[usr, default: [:]][usrsKey] {
+//            return cache
+//        }
+//
+//        func result(_ val: Bool) -> Bool {
+//            dataStore.inheritsFromX[usr, default: [:]][usrsKey] = val
+//            return val
+//        }
+//
+//        let req = SKRequestDictionary(sourcekitd: sourceKit)
+//        req[keys.request] = requests.cursorinfo
+//        req[keys.compilerargs] = module.compilerArguments
+//        req[keys.usr] = usr
+//        // We have to store the file of the USR because it looks CursorInfo doesn't returns USRs if you use the wrong one
+//        //, except if it's a closed source framework. No idea why it works like that.
+//        // Hopefully this won't break in the future.
+//        let file: File = dataStore.fileForUSR[usr] ?? module.sourceFiles.first!
+//        req[keys.sourcefile] = file.path
+//        let cursorInfo = try sourceKit.sendSync(req)
+//        guard let annotation: String = cursorInfo[keys.annotated_decl] else {
+//            logger.log("Pretending \(usr) inherits from Codable because SourceKit failed to look it up. This can happen if this USR belongs to an @objc class.", verbose: true)
+//            return result(true)
+//        }
+//        let regex = "usr=\\\"(.\\S*)\\\""
+//        let regexResult = annotation.match(regex: regex)
+//        for res in regexResult {
+//            let inheritedUSR = res.captureGroup(1, originalString: annotation)
+//            if usrs.contains(inheritedUSR) {
+//                return result(true)
+//            } else if try inheritsFromAnyUSR(inheritedUSR, anyOf: usrs, inModule: module) {
+//                return result(true)
+//            }
+//        }
+//        return result(false)
+//    }
 }
 
 // MARK: SKResponseDictionary Helpers
@@ -354,6 +420,10 @@ extension SKResponseDictionary {
         recurse(uid: sourcekitd.keys.related) { [unowned self] dict in
             guard isReference == false else {
                 return
+//        var visited4 = Set<String>()
+//        recurse(uid: sourcekitd.keys.related, visited: &visited4) { [unowned self] dict in
+//            guard isReference == false else {
+//                return
             }
             guard let usr: String = dict[self.sourcekitd.keys.usr] else {
                 return

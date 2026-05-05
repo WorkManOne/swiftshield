@@ -598,7 +598,7 @@ final class SKResponseDictionary {
     subscript(key: sourcekitd_uid_t?) -> SKResponseArray? {
         SKResponseArray(sourcekitd.api.variant_dictionary_get_value(dict, key), response: resp)
     }
-
+    
     func recurseEntities(block: @escaping (SKResponseDictionary) throws -> Void) rethrows {
         try recurse(uid: sourcekitd.keys.entities, block: block)
     }
@@ -613,6 +613,46 @@ final class SKResponseDictionary {
             return true
         }
     }
+//// AGRESSIVE:
+//    func recurseEntities(
+//        visited: inout Set<String>,
+//        block: @escaping (SKResponseDictionary) throws -> Void
+//    ) rethrows {
+//        try recurse(uid: sourcekitd.keys.entities, visited: &visited, block: block)
+//    }
+//
+//    func recurse(
+//        uid: sourcekitd_uid_t,
+//        visited: inout Set<String>,
+//        block: @escaping (SKResponseDictionary) throws -> Void
+//    ) rethrows {
+//        guard let array: SKResponseArray = self[uid] else { return }
+//        try array.forEach(parent: self) { (_, dict) -> Bool in
+//            // Has no USR -> dont block go further
+//            if let usr: String = dict[dict.sourcekitd.keys.usr] {
+//                guard !visited.contains(usr) else { return true }
+//                visited.insert(usr)
+//            }
+//            try block(dict)
+//            try dict.recurseEntities(visited: &visited, block: block)
+//            return true
+//        }
+//    }
+////BASE:
+//    func recurseEntities(block: @escaping (SKResponseDictionary) throws -> Void) rethrows {
+//        try recurse(uid: sourcekitd.keys.entities, block: block)
+//    }
+//
+//    func recurse(uid: sourcekitd_uid_t, block: @escaping (SKResponseDictionary) throws -> Void) rethrows {
+//        guard let array: SKResponseArray = self[uid] else {
+//            return
+//        }
+//        try array.forEach(parent: self) { (_, dict) -> Bool in
+//            try block(dict)
+//            try dict.recurseEntities(block: block)
+//            return true
+//        }
+//    }
 }
 
 final class SKResponseArray {
