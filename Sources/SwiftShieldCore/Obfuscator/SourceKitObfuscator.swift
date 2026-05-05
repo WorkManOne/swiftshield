@@ -97,7 +97,9 @@ extension SourceKitObfuscator {
         fromModule module: Module
     ) throws {
         let entityKind: SKUID = dict[keys.kind]!
+        logger.log("DEBUG process: kind=\(entityKind.description) name=\(dict[keys.name] ?? "nil") usr=\(dict[keys.usr] ?? "nil")")
         guard let kind = entityKind.declarationType() else {
+            logger.log("DEBUG SKIPPED (declarationType=nil)")
             return
         }
         guard let rawName: String = dict[keys.name],
@@ -178,10 +180,6 @@ extension SourceKitObfuscator {
         index.response.recurseEntities { [unowned self] dict in
             guard let kindId: SKUID = dict[self.keys.kind],
                 kindId.referenceType() != nil || kindId.declarationType() != nil,
-//        var visited3 = Set<String>()
-//        index.response.recurseEntities(visited: &visited3) { [unowned self] dict in
-//            guard let kindId: SKUID = dict[self.keys.kind],
-//                kindId.referenceType() != nil || kindId.declarationType() != nil,
                 let rawName: String = dict[self.keys.name],
                 let usr: String = dict[self.keys.usr],
                 self.dataStore.processedUsrs.contains(usr),
@@ -190,7 +188,6 @@ extension SourceKitObfuscator {
                 dict.isReferencingInternalFramework(dataStore: self.dataStore) == false else {
                 return
             }
-
             let name = rawName.removingParameterInformation
             let obfuscatedName = self.obfuscate(name: name)
             self.logger.log("* Found reference of \(name) (USR: \(usr) at \(index.file.name) (\(line):\(column)) -> now \(obfuscatedName)")
@@ -198,7 +195,18 @@ extension SourceKitObfuscator {
             referenceArray.append(reference)
         }
         let originalContents = try index.file.read()
+        // ВРЕМЕННО
+        if index.file.name == "UserService.swift" {
+            logger.log("=== referenceArray for UserService.swift ===")
+            for ref in referenceArray.sorted(by: <) {
+                logger.log("  name=\(ref.name) line=\(ref.line) col=\(ref.column)")
+            }
+            logger.log("=== total: \(referenceArray.count) references ===")
+        }
         let obfuscatedContents = obfuscate(fileContents: originalContents, fromReferences: referenceArray)
+
+//        let originalContents = try index.file.read()
+//        let obfuscatedContents = obfuscate(fileContents: originalContents, fromReferences: referenceArray)
         if let error = delegate?.obfuscator(self, didObfuscateFile: index.file, newContents: obfuscatedContents) {
             throw error
         }
@@ -276,13 +284,26 @@ extension SourceKitObfuscator {
                 let originalName = reference.name
                 let obfuscatedName = obfuscate(name: originalName)
                 let wasInternalKeyword = currentCharacter == "`"
-                for i in 1 ..< (originalName.count + (wasInternalKeyword ? 2 : 0)) {
+                let startIndex = currentCharIndex + (wasInternalKeyword ? 1 : 0)
+
+                // Считаем реальную длину идентификатора в файле
+                var actualLength = 0
+                while startIndex + actualLength < charArray.count {
+                    let ch = charArray[startIndex + actualLength]
+                    guard ch.count == 1,
+                          let scalar = ch.unicodeScalars.first,
+                          CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_")).contains(scalar) else { break }
+                    actualLength += 1
+                }
+                let totalLength = actualLength + (wasInternalKeyword ? 2 : 0)
+
+                for i in 1 ..< max(1, totalLength) {
                     charArray[currentCharIndex + i] = ""
                 }
                 charArray[currentCharIndex] = obfuscatedName
                 currentReferenceIndex += 1
-                currentCharIndex += originalName.count
-                column += originalName.utf8Count + (wasInternalKeyword ? 2 : 0)
+                currentCharIndex += max(1, totalLength - (wasInternalKeyword ? 1 : 0))
+                column += totalLength
                 if wasInternalKeyword {
                     charArray[currentCharIndex] = ""
                 }
@@ -311,7 +332,7 @@ extension SourceKitObfuscator {
             return val
         }
 
-        // *** Защита от циклов: помечаем как false пока считаем ***
+        // cycles flag = false while counting
         dataStore.inheritsFromX[usr, default: [:]][usrsKey] = false
 
         let req = SKRequestDictionary(sourcekitd: sourceKit)

@@ -830,8 +830,16 @@ public struct SKUID: CustomStringConvertible {
         let kindSuffix = String(kind[prefixIndex...])
         switch kindSuffix {
         case "class",
-             "struct":
+            "struct": // can obfuscate View occasionally
+//             "extension.class",
+//             "extension.struct",
+//             "extension.enum",
+//             "extension.protocol":
             return .object
+//        switch kindSuffix {
+//        case "class",
+//             "struct":
+//            return .object
         case "protocol":
             return .protocol
         case "var.instance",
