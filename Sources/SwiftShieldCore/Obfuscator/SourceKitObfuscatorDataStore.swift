@@ -10,4 +10,5 @@ final class SourceKitObfuscatorDataStore {
     var inheritsFromX = [String: [String: Bool]]()
     var fileForUSR = [String: File]()
     var declaredTypeNames = Set<String>()
+    var moduleForFile = [String: Module]()
 }

@@ -42,6 +42,7 @@ extension SourceKitObfuscator {
             response.recurseEntities { [unowned self] dict in
                 self.preprocess(declarationEntity: dict, ofFile: file, fromModule: module)
             }
+            dataStore.moduleForFile[file.path] = module
 ////BASE:
 //            logger.log("--- Preprocessing indexing result of: \(file.name)")
 //            response.recurseEntities { [unowned self] dict in
@@ -348,10 +349,11 @@ extension SourceKitObfuscator {
 
         let req = SKRequestDictionary(sourcekitd: sourceKit)
         req[keys.request] = requests.cursorinfo
-        req[keys.compilerargs] = module.compilerArguments
         req[keys.usr] = usr
         let file: File = dataStore.fileForUSR[usr] ?? module.sourceFiles.first!
+        let correctModule = dataStore.moduleForFile[file.path] ?? module
         req[keys.sourcefile] = file.path
+        req[keys.compilerargs] = correctModule.compilerArguments
         let cursorInfo = try sourceKit.sendSync(req)
         guard let annotation: String = cursorInfo[keys.annotated_decl] else {
             logger.log("Pretending \(usr) inherits from Codable because SourceKit failed to look it up. This can happen if this USR belongs to an @objc class.", verbose: true)
