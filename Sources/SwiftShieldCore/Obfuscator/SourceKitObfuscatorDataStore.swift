@@ -11,4 +11,5 @@ final class SourceKitObfuscatorDataStore {
     var fileForUSR = [String: File]()
     var declaredTypeNames = Set<String>()
     var moduleForFile = [String: Module]()
+    var protocolsConformedByExternalTypes = Set<String>()
 }

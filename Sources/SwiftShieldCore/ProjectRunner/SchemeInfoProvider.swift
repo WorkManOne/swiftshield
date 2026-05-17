@@ -60,7 +60,10 @@ struct SchemeInfoProvider: SchemeInfoProviderProtocol {
         guard modules[moduleName]?.args.isEmpty != false else {
             return
         }
-        guard var fullRelevantArguments = firstMatch(for: "/usr/bin/swiftc.*-module-name \(moduleName) .*", in: line) else {
+//        guard var fullRelevantArguments = firstMatch(for: "/usr/bin/swiftc.*-module-name \(moduleName) .*", in: line) else {
+//            throw logger.fatalError(forMessage: "Failed to retrieve \(moduleName) xcodebuild arguments")
+//        }
+        guard var fullRelevantArguments = firstMatch(for: "swiftc -module-name \(moduleName) .*", in: line) else {
             throw logger.fatalError(forMessage: "Failed to retrieve \(moduleName) xcodebuild arguments")
         }
 
